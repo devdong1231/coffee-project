@@ -102,6 +102,28 @@ class PointControllerTest {
     }
 
     @Test
+    void 충전_후_잔액이_허용_범위를_초과하면_400을_반환한다() throws Exception {
+        User user = userRepository.save(User.create("사용자"));
+        Point point = pointRepository.save(Point.create(user, Long.MAX_VALUE));
+
+        mockMvc.perform(post("/api/points/charge")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": %d,
+                                  "amount": 1
+                                }
+                                """.formatted(user.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("충전 후 잔액이 허용 범위를 초과합니다."));
+
+        Point unchangedPoint = pointRepository.findById(point.getId()).orElseThrow();
+        assertThat(unchangedPoint.getBalance()).isEqualTo(Long.MAX_VALUE);
+        assertThat(pointHistoryRepository.findAll()).isEmpty();
+    }
+
+    @Test
     void 존재하지_않는_사용자이면_404를_반환한다() throws Exception {
         mockMvc.perform(post("/api/points/charge")
                         .contentType(MediaType.APPLICATION_JSON)
