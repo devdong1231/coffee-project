@@ -62,7 +62,11 @@ public class OrderItem {
     }
 
     public Long getLinePrice() {
-        return orderPrice * quantity;
+        try {
+            return Math.multiplyExact(orderPrice, quantity);
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("주문 금액이 허용 범위를 초과합니다.");
+        }
     }
 
     boolean isSameMenu(CoffeeMenu menu) {

@@ -55,7 +55,7 @@ public class Order extends BaseTimeEntity {
         validateDuplicateMenu(menu);
         OrderItem item = OrderItem.create(this, menu, quantity);
         items.add(item);
-        totalPrice += item.getLinePrice();
+        totalPrice = addExact(totalPrice, item.getLinePrice());
     }
 
     public List<OrderItem> getItems() {
@@ -73,6 +73,14 @@ public class Order extends BaseTimeEntity {
     private static void validateUser(User user) {
         if (user == null) {
             throw new IllegalArgumentException("사용자는 필수입니다.");
+        }
+    }
+
+    private static Long addExact(Long totalPrice, Long linePrice) {
+        try {
+            return Math.addExact(totalPrice, linePrice);
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException("주문 금액이 허용 범위를 초과합니다.");
         }
     }
 }
