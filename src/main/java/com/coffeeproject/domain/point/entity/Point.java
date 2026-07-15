@@ -49,6 +49,7 @@ public class Point extends BaseTimeEntity {
 
     public void charge(Long amount) {
         validatePositive(amount);
+        validateChargeLimit(amount);
         this.balance += amount;
     }
 
@@ -75,6 +76,12 @@ public class Point extends BaseTimeEntity {
     private static void validatePositiveOrZero(Long amount) {
         if (amount == null || amount < 0) {
             throw new IllegalArgumentException("잔액은 0 이상이어야 합니다.");
+        }
+    }
+
+    private void validateChargeLimit(Long amount) {
+        if (Long.MAX_VALUE - balance < amount) {
+            throw new IllegalArgumentException("충전 후 잔액이 허용 범위를 초과합니다.");
         }
     }
 }
