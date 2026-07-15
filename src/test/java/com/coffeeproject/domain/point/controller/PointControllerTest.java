@@ -1,15 +1,25 @@
 package com.coffeeproject.domain.point.controller;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.coffeeproject.domain.point.dto.PointChargeRequest;
 import com.coffeeproject.domain.point.entity.Point;
 import com.coffeeproject.domain.point.repository.PointHistoryRepository;
 import com.coffeeproject.domain.point.repository.PointRepository;
+import com.coffeeproject.domain.point.service.PointService;
 import com.coffeeproject.domain.user.entity.User;
 import com.coffeeproject.domain.user.repository.UserRepository;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +45,9 @@ class PointControllerTest {
 
     @Autowired
     private PointHistoryRepository pointHistoryRepository;
+
+    @Autowired
+    private PointService pointService;
 
     @BeforeEach
     void setUp() {
@@ -65,10 +78,9 @@ class PointControllerTest {
                 .andExpect(jsonPath("$.data.balance").value(11000));
 
         Point chargedPoint = pointRepository.findById(point.getId()).orElseThrow();
-        org.assertj.core.api.Assertions.assertThat(chargedPoint.getBalance()).isEqualTo(11000L);
-        org.assertj.core.api.Assertions.assertThat(pointHistoryRepository.findAll()).hasSize(1);
-        org.assertj.core.api.Assertions.assertThat(pointHistoryRepository.findAll().get(0).getBalanceAfter())
-                .isEqualTo(11000L);
+        assertThat(chargedPoint.getBalance()).isEqualTo(11000L);
+        assertThat(pointHistoryRepository.findAll()).hasSize(1);
+        assertThat(pointHistoryRepository.findAll().get(0).getBalanceAfter()).isEqualTo(11000L);
     }
 
     @Test
@@ -102,5 +114,61 @@ class PointControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("사용자를 찾을 수 없습니다."));
+    }
+
+    @Test
+    void 요청_본문이_없으면_400을_반환한다() throws Exception {
+        mockMvc.perform(post("/api/points/charge")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("요청 본문이 올바르지 않습니다."));
+    }
+
+    @Test
+    void 요청_본문이_잘못된_JSON이면_400을_반환한다() throws Exception {
+        mockMvc.perform(post("/api/points/charge")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": 1,
+                                  "amount": 10000
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("요청 본문이 올바르지 않습니다."));
+    }
+
+    @Test
+    void 동일_사용자에게_동시에_포인트를_충전해도_금액이_유실되지_않는다() throws Exception {
+        User user = userRepository.save(User.create("사용자"));
+        Point point = pointRepository.save(Point.create(user, 0L));
+        int requestCount = 10;
+        long chargeAmount = 1000L;
+
+        ExecutorService executorService = Executors.newFixedThreadPool(requestCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (int i = 0; i < requestCount; i++) {
+            futures.add(executorService.submit(() -> {
+                startLatch.await();
+                pointService.charge(new PointChargeRequest(user.getId(), chargeAmount));
+                return null;
+            }));
+        }
+
+        startLatch.countDown();
+        for (Future<?> future : futures) {
+            future.get();
+        }
+
+        executorService.shutdown();
+        boolean terminated = executorService.awaitTermination(5, TimeUnit.SECONDS);
+
+        Point chargedPoint = pointRepository.findById(point.getId()).orElseThrow();
+        assertThat(terminated).isTrue();
+        assertThat(chargedPoint.getBalance()).isEqualTo(requestCount * chargeAmount);
+        assertThat(pointHistoryRepository.findAll()).hasSize(requestCount);
     }
 }
