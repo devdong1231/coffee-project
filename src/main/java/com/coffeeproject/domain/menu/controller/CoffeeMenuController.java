@@ -1,6 +1,7 @@
 package com.coffeeproject.domain.menu.controller;
 
 import com.coffeeproject.domain.menu.dto.CoffeeMenuResponse;
+import com.coffeeproject.domain.menu.dto.PopularCoffeeMenuResponse;
 import com.coffeeproject.domain.menu.service.CoffeeMenuService;
 import com.coffeeproject.global.response.ApiResponse;
 import java.util.List;
@@ -22,6 +23,14 @@ public class CoffeeMenuController {
         return ResponseEntity.ok(ApiResponse.success(
                 "메뉴 조회 성공",
                 coffeeMenuService.getMenus()
+        ));
+    }
+
+    @GetMapping("/popular")
+    public ResponseEntity<ApiResponse<List<PopularCoffeeMenuResponse>>> getPopularMenus() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "인기 메뉴 조회 성공",
+                coffeeMenuService.getPopularMenus()
         ));
     }
 }

@@ -3,9 +3,12 @@ package com.coffeeproject.domain.order.service;
 import com.coffeeproject.domain.menu.entity.CoffeeMenu;
 import com.coffeeproject.domain.menu.entity.MenuStatus;
 import com.coffeeproject.domain.menu.repository.CoffeeMenuRepository;
+import com.coffeeproject.domain.menu.service.PopularMenuRankingService;
+import com.coffeeproject.domain.menu.service.PopularMenuRankingService.PopularMenuIncrement;
 import com.coffeeproject.domain.order.dto.OrderCreateRequest;
 import com.coffeeproject.domain.order.dto.OrderCreateResponse;
 import com.coffeeproject.domain.order.entity.Order;
+import com.coffeeproject.domain.order.entity.OrderItem;
 import com.coffeeproject.domain.order.repository.OrderRepository;
 import com.coffeeproject.domain.outbox.entity.OutboxEvent;
 import com.coffeeproject.domain.outbox.repository.OutboxEventRepository;
@@ -35,6 +38,7 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final PointHistoryRepository pointHistoryRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final PopularMenuRankingService popularMenuRankingService;
 
     @Transactional
     public OrderCreateResponse createOrder(OrderCreateRequest request) {
@@ -58,6 +62,7 @@ public class OrderService {
                 savedOrder,
                 createOrderCompletedPayload(savedOrder, user, totalPrice)
         ));
+        popularMenuRankingService.increaseAfterCommit(createPopularMenuIncrements(savedOrder.getItems()));
 
         return OrderCreateResponse.of(savedOrder.getId(), totalPrice, point.getBalance());
     }
@@ -116,6 +121,12 @@ public class OrderService {
         return """
                 {"userId":%d,"orderId":%d,"items":[%s],"paymentAmount":%d}"""
                 .formatted(user.getId(), order.getId(), items, paymentAmount);
+    }
+
+    private List<PopularMenuIncrement> createPopularMenuIncrements(List<OrderItem> items) {
+        return items.stream()
+                .map(item -> new PopularMenuIncrement(item.getMenu().getId(), item.getQuantity()))
+                .toList();
     }
 
     private long multiplyExact(long price, int quantity) {
