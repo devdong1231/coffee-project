@@ -4,6 +4,7 @@ skills/
 AGENTS.md
 .gradle
 build/
+.tools/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
