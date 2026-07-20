@@ -1,5 +1,6 @@
 package com.coffeeproject.domain.outbox.config;
 
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
@@ -8,7 +9,12 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
 
     @Bean
-    public RestClient.Builder restClientBuilder() {
-        return RestClient.builder();
+    public RestClient.Builder restClientBuilder(OutboxProperties outboxProperties) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(outboxProperties.getConnectTimeout());
+        requestFactory.setReadTimeout(outboxProperties.getReadTimeout());
+
+        return RestClient.builder()
+                .requestFactory(requestFactory);
     }
 }

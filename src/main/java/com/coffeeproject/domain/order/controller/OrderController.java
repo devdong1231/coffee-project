@@ -2,7 +2,7 @@ package com.coffeeproject.domain.order.controller;
 
 import com.coffeeproject.domain.order.dto.OrderCreateRequest;
 import com.coffeeproject.domain.order.dto.OrderCreateResponse;
-import com.coffeeproject.domain.order.service.OrderService;
+import com.coffeeproject.domain.order.facade.OrderFacade;
 import com.coffeeproject.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/orders")
 public class OrderController {
 
-    private final OrderService orderService;
+    private final OrderFacade orderFacade;
 
     @PostMapping
     public ResponseEntity<ApiResponse<OrderCreateResponse>> createOrder(
@@ -29,7 +29,7 @@ public class OrderController {
                 .body(ApiResponse.success(
                         HttpStatus.CREATED,
                         "주문 성공",
-                        orderService.createOrder(request)
+                        orderFacade.createOrder(request)
                 ));
     }
 }

@@ -3,19 +3,9 @@ package com.coffeeproject.domain.order.service;
 import com.coffeeproject.domain.menu.entity.CoffeeMenu;
 import com.coffeeproject.domain.menu.entity.MenuStatus;
 import com.coffeeproject.domain.menu.repository.CoffeeMenuRepository;
-import com.coffeeproject.domain.menu.service.PopularMenuRankingService;
-import com.coffeeproject.domain.menu.service.PopularMenuRankingService.PopularMenuIncrement;
 import com.coffeeproject.domain.order.dto.OrderCreateRequest;
-import com.coffeeproject.domain.order.dto.OrderCreateResponse;
 import com.coffeeproject.domain.order.entity.Order;
-import com.coffeeproject.domain.order.entity.OrderItem;
 import com.coffeeproject.domain.order.repository.OrderRepository;
-import com.coffeeproject.domain.outbox.entity.OutboxEvent;
-import com.coffeeproject.domain.outbox.repository.OutboxEventRepository;
-import com.coffeeproject.domain.point.entity.Point;
-import com.coffeeproject.domain.point.entity.PointHistory;
-import com.coffeeproject.domain.point.repository.PointHistoryRepository;
-import com.coffeeproject.domain.point.repository.PointRepository;
 import com.coffeeproject.domain.user.entity.User;
 import com.coffeeproject.domain.user.repository.UserRepository;
 import com.coffeeproject.global.exception.BusinessException;
@@ -26,7 +16,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -34,37 +23,20 @@ public class OrderService {
 
     private final UserRepository userRepository;
     private final CoffeeMenuRepository coffeeMenuRepository;
-    private final PointRepository pointRepository;
     private final OrderRepository orderRepository;
-    private final PointHistoryRepository pointHistoryRepository;
-    private final OutboxEventRepository outboxEventRepository;
-    private final PopularMenuRankingService popularMenuRankingService;
 
-    @Transactional
-    public OrderCreateResponse createOrder(OrderCreateRequest request) {
+    public OrderCreateResult createOrder(OrderCreateRequest request) {
         User user = userRepository.findById(request.userId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Map<Long, CoffeeMenu> menuMap = findMenuMap(request.items());
         long totalPrice = calculateTotalPrice(request.items(), menuMap);
 
-        Point point = pointRepository.findByUserIdWithLock(user.getId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-        validateEnoughPoint(point, totalPrice);
-        point.use(totalPrice);
-
         Order order = Order.create(user);
         request.items().forEach(item -> order.addItem(menuMap.get(item.menuId()), item.quantity()));
         Order savedOrder = orderRepository.save(order);
 
-        pointHistoryRepository.save(PointHistory.use(user, savedOrder, totalPrice, point.getBalance()));
-        outboxEventRepository.save(OutboxEvent.orderCompleted(
-                savedOrder,
-                createOrderCompletedPayload(savedOrder, user, totalPrice)
-        ));
-        popularMenuRankingService.increaseAfterCommit(createPopularMenuIncrements(savedOrder.getItems()));
-
-        return OrderCreateResponse.of(savedOrder.getId(), totalPrice, point.getBalance());
+        return new OrderCreateResult(user, savedOrder, totalPrice);
     }
 
     private Map<Long, CoffeeMenu> findMenuMap(List<OrderCreateRequest.OrderItemRequest> items) {
@@ -102,31 +74,6 @@ public class OrderService {
             totalPrice = addExact(totalPrice, linePrice);
         }
         return totalPrice;
-    }
-
-    private void validateEnoughPoint(Point point, long totalPrice) {
-        if (point.getBalance() < totalPrice) {
-            throw new BusinessException(ErrorCode.INSUFFICIENT_POINT);
-        }
-    }
-
-    private String createOrderCompletedPayload(Order order, User user, long paymentAmount) {
-        String items = order.getItems()
-                .stream()
-                .map(item -> """
-                        {"menuId":%d,"quantity":%d,"orderPrice":%d}"""
-                        .formatted(item.getMenu().getId(), item.getQuantity(), item.getOrderPrice()))
-                .collect(Collectors.joining(","));
-
-        return """
-                {"userId":%d,"orderId":%d,"items":[%s],"paymentAmount":%d}"""
-                .formatted(user.getId(), order.getId(), items, paymentAmount);
-    }
-
-    private List<PopularMenuIncrement> createPopularMenuIncrements(List<OrderItem> items) {
-        return items.stream()
-                .map(item -> new PopularMenuIncrement(item.getMenu().getId(), item.getQuantity()))
-                .toList();
     }
 
     private long multiplyExact(long price, int quantity) {
