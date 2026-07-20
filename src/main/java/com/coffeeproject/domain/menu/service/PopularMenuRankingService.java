@@ -3,9 +3,6 @@ package com.coffeeproject.domain.menu.service;
 import com.coffeeproject.global.exception.BusinessException;
 import com.coffeeproject.global.exception.ErrorCode;
 import java.time.Clock;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -23,11 +20,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 @RequiredArgsConstructor
 public class PopularMenuRankingService {
-
-    private static final String KEY_PREFIX = "coffee:ranking:";
-    private static final int RECENT_DAYS = 7;
-    private static final int POPULAR_MENU_LIMIT = 3;
-    private static final Duration RANKING_TTL = Duration.ofDays(10);
 
     private final StringRedisTemplate redisTemplate;
     private final Clock clock;
@@ -54,9 +46,9 @@ public class PopularMenuRankingService {
         Map<Long, Long> menuIdToOrderCount = new HashMap<>();
 
         try {
-            for (LocalDate date : recentDates()) {
+            for (var date : PopularMenuRankingPolicy.recentDates(clock)) {
                 Set<TypedTuple<String>> tuples = redisTemplate.opsForZSet()
-                        .reverseRangeWithScores(key(date), 0, -1);
+                        .reverseRangeWithScores(PopularMenuRankingPolicy.key(date), 0, -1);
                 mergeRanking(menuIdToOrderCount, tuples);
             }
         } catch (RuntimeException exception) {
@@ -69,20 +61,19 @@ public class PopularMenuRankingService {
                 .sorted(Comparator
                         .comparing(PopularMenuRank::orderCount, Comparator.reverseOrder())
                         .thenComparing(PopularMenuRank::menuId))
-                .limit(POPULAR_MENU_LIMIT)
+                .limit(PopularMenuRankingPolicy.POPULAR_MENU_LIMIT)
                 .toList();
     }
 
     private void increase(List<PopularMenuIncrement> increments) {
-        LocalDate today = LocalDate.now(clock);
-        String key = key(today);
+        String key = PopularMenuRankingPolicy.key(java.time.LocalDate.now(clock));
 
         try {
             for (PopularMenuIncrement increment : increments) {
                 redisTemplate.opsForZSet()
                         .incrementScore(key, String.valueOf(increment.menuId()), increment.quantity());
             }
-            redisTemplate.expire(key, RANKING_TTL);
+            redisTemplate.expire(key, PopularMenuRankingPolicy.RANKING_TTL);
         } catch (RuntimeException exception) {
             log.error("Failed to update popular menu ranking. key={}", key, exception);
         }
@@ -118,19 +109,6 @@ public class PopularMenuRankingService {
             return 0L;
         }
         return Math.round(score);
-    }
-
-    private List<LocalDate> recentDates() {
-        LocalDate today = LocalDate.now(clock);
-        List<LocalDate> dates = new ArrayList<>();
-        for (int i = 0; i < RECENT_DAYS; i++) {
-            dates.add(today.minusDays(i));
-        }
-        return dates;
-    }
-
-    private String key(LocalDate date) {
-        return KEY_PREFIX + date;
     }
 
     public record PopularMenuIncrement(Long menuId, int quantity) {
