@@ -12,6 +12,7 @@ public enum ErrorCode {
     INSUFFICIENT_POINT(HttpStatus.BAD_REQUEST, "포인트가 부족합니다."),
     MENU_NOT_ORDERABLE(HttpStatus.BAD_REQUEST, "판매 가능한 메뉴가 아닙니다."),
     POPULAR_MENU_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "인기 메뉴 조회를 일시적으로 사용할 수 없습니다."),
+    ADMIN_API_FORBIDDEN(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     MENU_NOT_FOUND(HttpStatus.NOT_FOUND, "메뉴를 찾을 수 없습니다."),

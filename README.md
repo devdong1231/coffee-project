@@ -335,12 +335,13 @@ erDiagram
 
 ## 7. API 명세
 
-| 기능         | Method | URL                  |
-|------------|--------|----------------------|
-| 커피 메뉴 조회   | GET    | `/api/menus`         |
-| 포인트 충전     | POST   | `/api/points/charge` |
-| 커피 주문 및 결제 | POST   | `/api/orders`        |
-| 인기 메뉴 조회   | GET    | `/api/menus/popular` |
+| 기능            | Method | URL                                  |
+|---------------|--------|--------------------------------------|
+| 커피 메뉴 조회      | GET    | `/api/menus`                         |
+| 포인트 충전        | POST   | `/api/points/charge`                 |
+| 커피 주문 및 결제    | POST   | `/api/orders`                        |
+| 인기 메뉴 조회      | GET    | `/api/menus/popular`                 |
+| 인기 메뉴 랭킹 복구 실행 | POST   | `/api/admin/menus/popular/rebuild`   |
 
 ---
 
@@ -461,6 +462,32 @@ GET /api/menus/popular
       "orderCount": 25
     }
   ]
+}
+```
+
+---
+
+### 7.5 인기 메뉴 랭킹 복구 실행
+
+#### Request
+
+```http
+POST /api/admin/menus/popular/rebuild
+X-Admin-Token: {admin token}
+```
+
+`coffee.admin.token` 설정값과 요청 헤더의 `X-Admin-Token` 값이 일치할 때만 실행됩니다.
+
+#### Response
+
+```json
+{
+  "status": 200,
+  "message": "인기 메뉴 랭킹 복구 성공",
+  "data": {
+    "orderCount": 2,
+    "itemCount": 6
+  }
 }
 ```
 
