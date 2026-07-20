@@ -731,3 +731,15 @@ K6를 이용하여 주요 조회 및 주문 API의 성능을 측정합니다.
 - 서로 다른 사용자의 동시 주문 테스트
 - 동일 사용자에게 요청이 집중되는 상황의 동시 주문 테스트
 - Redis 적용 전후 인기 메뉴 조회 응답 시간 비교
+
+K6 스크립트는 `k6/` 디렉터리에 둡니다.
+
+```powershell
+k6 run k6/menu-list.js
+k6 run k6/popular-menu.js
+k6 run -e USER_IDS=1,2 -e MENU_IDS=1,2 k6/order-concurrent.js
+```
+
+기본 대상 서버는 `http://localhost:8080`이며, 다른 서버를 테스트하려면 `BASE_URL` 환경변수를 지정합니다.
+
+주문 동시 요청 테스트는 포인트 충전 및 주문 전에 사용할 사용자와 메뉴 데이터가 준비되어 있어야 합니다.
