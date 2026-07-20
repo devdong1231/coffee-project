@@ -56,6 +56,27 @@
 
 ---
 
+### 3.1 실행 Profile
+
+애플리케이션은 MySQL 기준으로 실행하며, datasource 설정은 `mysql` profile에 분리합니다.
+
+```powershell
+.\gradlew.bat bootRun --args="--spring.profiles.active=mysql"
+```
+
+`mysql` profile은 아래 환경변수를 사용할 수 있습니다.
+
+| 환경변수                      | 기본값                                                                 |
+|---------------------------|---------------------------------------------------------------------|
+| `MYSQL_DATASOURCE_URL`    | `jdbc:mysql://localhost:3306/coffee_project?serverTimezone=Asia/Seoul&characterEncoding=UTF-8` |
+| `MYSQL_DATASOURCE_USERNAME` | `root`                                                              |
+| `MYSQL_DATASOURCE_PASSWORD` | 빈 값                                                                 |
+| `MYSQL_DDL_AUTO`          | `update`                                                            |
+
+테스트는 `src/test/resources/application.properties`에서 H2 datasource를 사용합니다.
+
+---
+
 ## 4. 문제 해결 전략
 
 ### 4.1 동시성 제어
