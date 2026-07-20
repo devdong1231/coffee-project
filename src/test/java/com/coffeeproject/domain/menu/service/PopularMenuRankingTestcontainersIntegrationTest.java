@@ -16,7 +16,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,6 +122,50 @@ class PopularMenuRankingTestcontainersIntegrationTest {
         assertThat(redisTemplate.opsForZSet().score(key, "2")).isEqualTo(1.0);
         assertThat(redisTemplate.getExpire(key, TimeUnit.SECONDS))
                 .isBetween(1L, PopularMenuRankingPolicy.RANKING_TTL.toSeconds());
+    }
+
+    @Test
+    void Redis_ZINCRBY를_동시에_실행해도_판매_수량이_유실되지_않는다() throws Exception {
+        String key = PopularMenuRankingPolicy.key(TODAY);
+        Long menuId = 1L;
+        int requestCount = 20;
+        int quantity = 3;
+        ExecutorService executorService = Executors.newFixedThreadPool(requestCount);
+        CountDownLatch readyLatch = new CountDownLatch(requestCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < requestCount; i++) {
+                futures.add(executorService.submit(() -> {
+                    readyLatch.countDown();
+                    if (!startLatch.await(3, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Redis 동시 증가 시작 대기 시간이 초과되었습니다.");
+                    }
+                    popularMenuRankingService.increaseAfterCommit(List.of(
+                            new PopularMenuIncrement(menuId, quantity)
+                    ));
+                    return null;
+                }));
+            }
+
+            assertThat(readyLatch.await(3, TimeUnit.SECONDS)).isTrue();
+            startLatch.countDown();
+
+            for (Future<?> future : futures) {
+                future.get();
+            }
+
+            executorService.shutdown();
+            assertThat(executorService.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(redisTemplate.opsForZSet().score(key, String.valueOf(menuId)))
+                    .isEqualTo((double) requestCount * quantity);
+            assertThat(redisTemplate.getExpire(key, TimeUnit.SECONDS))
+                    .isBetween(1L, PopularMenuRankingPolicy.RANKING_TTL.toSeconds());
+        } finally {
+            executorService.shutdownNow();
+        }
     }
 
     @Test
